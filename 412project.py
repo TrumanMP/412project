@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import psycopg2
 from dash import Dash, Input, Output, dcc, html
+from dash.dash_table import DataTable
 
 
 # Manual PostgreSQL connection handling
@@ -74,20 +75,37 @@ app.layout = html.Div(
             min=1,
         ),
         dcc.Graph(id="salary-chart"),
+        html.Hr(),
+        html.H3("Database Table Viewer"),
+        DataTable(
+            id="data-table",
+            columns=[], 
+            page_size=10,
+            style_table={"overflowX": "auto"},
+        ),
     ]
 )
 
 
 # Callback for updating the chart based on user input
 @app.callback(
-    Output("salary-chart", "figure"),
+    [
+        Output("salary-chart", "figure"), 
+        Output("data-table", "columns"),  
+        Output("data-table", "data"),     
+    ],
     [
         Input("analysis-dropdown", "value"),
         Input("year-dropdown", "value"),
         Input("top-n-input", "value"),
     ],
 )
-def update_chart(analysis_type, selected_year, top_n):
+def update_chart_and_table(analysis_type, selected_year, top_n):
+    # Default query results
+    chart_figure = {}
+    table_columns = []
+    table_data = []
+
     if analysis_type == "avg_salary":
         # Query for average salary by department
         query = f"""
@@ -99,7 +117,7 @@ def update_chart(analysis_type, selected_year, top_n):
         """
         data = pd.read_sql_query(query, conn)
 
-        # Aggregate data into top N + "Other"
+        # Chart for average salary
         data = data.sort_values(by="avg_salary", ascending=False)
         top_departments = data.iloc[:top_n]
         other_departments = data.iloc[top_n:]
@@ -118,7 +136,6 @@ def update_chart(analysis_type, selected_year, top_n):
                 ]
             )
 
-        # Rename columns for better display
         top_departments.rename(
             columns={
                 "department_description": "Department",
@@ -127,8 +144,7 @@ def update_chart(analysis_type, selected_year, top_n):
             inplace=True,
         )
 
-        # Create bar chart
-        fig = px.bar(
+        chart_figure = px.bar(
             top_departments,
             x="Average Salary",
             y="Department",
@@ -137,18 +153,22 @@ def update_chart(analysis_type, selected_year, top_n):
             labels={"Average Salary": "Average Salary ($)", "Department": "Department"},
             text="Average Salary",
         )
-        fig.update_layout(
+        chart_figure.update_layout(
             yaxis={"categoryorder": "total ascending"},
             xaxis_title="Average Salary ($)",
             yaxis_title="Department",
             template="plotly_white",
         )
-        fig.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+        chart_figure.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+
+        # Populate table for the database viewer
+        table_columns = [{"name": col, "id": col} for col in data.columns]
+        table_data = data.to_dict("records")
 
     elif analysis_type == "highest_salaries":
         # Query for highest individual salaries
         query = f"""
-            SELECT full_name, salary
+            SELECT full_name, job_description, department_description, salary
             FROM asu_employee_salary_data
             WHERE calendar_year = {selected_year}
             ORDER BY salary DESC
@@ -156,14 +176,13 @@ def update_chart(analysis_type, selected_year, top_n):
         """
         data = pd.read_sql_query(query, conn)
 
-        # Rename columns for better display
+        # Chart for highest salaries
         data.rename(
             columns={"full_name": "Employee", "salary": "Salary"},
             inplace=True,
         )
 
-        # Create bar chart
-        fig = px.bar(
+        chart_figure = px.bar(
             data,
             x="Salary",
             y="Employee",
@@ -172,15 +191,24 @@ def update_chart(analysis_type, selected_year, top_n):
             labels={"Salary": "Salary ($)", "Employee": "Employee"},
             text="Salary",
         )
-        fig.update_layout(
+        chart_figure.update_layout(
             yaxis={"categoryorder": "total ascending"},
             xaxis_title="Salary ($)",
             yaxis_title="Employee",
             template="plotly_white",
         )
-        fig.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+        chart_figure.update_traces(
+            text=data['Salary'].apply(lambda x: f"${x:,.2f}"),  
+            textposition="outside"
+        )
 
-    return fig
+    
+        table_columns = [{"name": col, "id": col} for col in data.columns]
+        table_data = data.to_dict("records")
+
+    return chart_figure, table_columns, table_data
+
+
 
 
 if __name__ == "__main__":
