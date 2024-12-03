@@ -50,86 +50,136 @@ app = Dash(__name__)
 
 app.layout = html.Div(
     [
-        html.H1("Salary Analysis by Department"),
+        html.H1("Salary Analysis"),
+        html.Label("Select Analysis Type:"),
+        dcc.Dropdown(
+            id="analysis-dropdown",
+            options=[
+                {"label": "Average Salary by Department", "value": "avg_salary"},
+                {"label": "Highest Individual Salaries", "value": "highest_salaries"},
+            ],
+            value="avg_salary",  # Default option
+        ),
         html.Label("Select Calendar Year:"),
         dcc.Dropdown(
             id="year-dropdown",
             options=[{"label": str(year), "value": year} for year in available_years],
             value=available_years[0],  # Default to the first year
         ),
-        html.Label("Select Top N Departments:"),
+        html.Label("Select Top N Records:"),
         dcc.Input(
             id="top-n-input",
             type="number",
-            value=5,  # Default to Top 5 departments
+            value=5,  # Default to Top 5 records
             min=1,
         ),
-        dcc.Graph(id="salary-bar-chart"),
+        dcc.Graph(id="salary-chart"),
     ]
 )
 
 
 # Callback for updating the chart based on user input
 @app.callback(
-    Output("salary-bar-chart", "figure"),
-    [Input("year-dropdown", "value"), Input("top-n-input", "value")],
+    Output("salary-chart", "figure"),
+    [
+        Input("analysis-dropdown", "value"),
+        Input("year-dropdown", "value"),
+        Input("top-n-input", "value"),
+    ],
 )
-def update_chart(selected_year, top_n):
-    # Fetch department data for the selected year
-    query = f"""
-        SELECT department_description, AVG(salary) AS avg_salary
-        FROM asu_employee_salary_data
-        WHERE calendar_year = {selected_year}
-        GROUP BY department_description
-        ORDER BY avg_salary DESC;
-    """
-    data = pd.read_sql_query(query, conn)
+def update_chart(analysis_type, selected_year, top_n):
+    if analysis_type == "avg_salary":
+        # Query for average salary by department
+        query = f"""
+            SELECT department_description, AVG(salary) AS avg_salary
+            FROM asu_employee_salary_data
+            WHERE calendar_year = {selected_year}
+            GROUP BY department_description
+            ORDER BY avg_salary DESC;
+        """
+        data = pd.read_sql_query(query, conn)
 
-    # Aggregate data into top N + "Other"
-    data = data.sort_values(by="avg_salary", ascending=False)
-    top_departments = data.iloc[:top_n]
-    other_departments = data.iloc[top_n:]
+        # Aggregate data into top N + "Other"
+        data = data.sort_values(by="avg_salary", ascending=False)
+        top_departments = data.iloc[:top_n]
+        other_departments = data.iloc[top_n:]
 
-    if not other_departments.empty:
-        other_avg_salary = other_departments["avg_salary"].mean()
-        top_departments = pd.concat(
-            [
-                top_departments,
-                pd.DataFrame(
-                    {
-                        "department_description": ["Other"],
-                        "avg_salary": [other_avg_salary],
-                    }
-                ),
-            ]
+        if not other_departments.empty:
+            other_avg_salary = other_departments["avg_salary"].mean()
+            top_departments = pd.concat(
+                [
+                    top_departments,
+                    pd.DataFrame(
+                        {
+                            "department_description": ["Other"],
+                            "avg_salary": [other_avg_salary],
+                        }
+                    ),
+                ]
+            )
+
+        # Rename columns for better display
+        top_departments.rename(
+            columns={
+                "department_description": "Department",
+                "avg_salary": "Average Salary",
+            },
+            inplace=True,
         )
 
-    # Rename columns for better display
-    top_departments.rename(
-        columns={
-            "department_description": "Department",
-            "avg_salary": "Average Salary",
-        },
-        inplace=True,
-    )
+        # Create bar chart
+        fig = px.bar(
+            top_departments,
+            x="Average Salary",
+            y="Department",
+            orientation="h",
+            title=f"Average Salary by Department for {selected_year} (Top {top_n} + Other)",
+            labels={"Average Salary": "Average Salary ($)", "Department": "Department"},
+            text="Average Salary",
+        )
+        fig.update_layout(
+            yaxis={"categoryorder": "total ascending"},
+            xaxis_title="Average Salary ($)",
+            yaxis_title="Department",
+            template="plotly_white",
+        )
+        fig.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
 
-    # Create bar chart
-    fig = px.bar(
-        top_departments,
-        x="Average Salary",
-        y="Department",
-        orientation="h",
-        title=f"Average Salary by Department for {selected_year} (Top {top_n} + Other)",
-        labels={"Average Salary": "Average Salary ($)", "Department": "Department"},
-        text="Average Salary",
-    )
-    fig.update_layout(
-        yaxis={"categoryorder": "total ascending"},
-        xaxis_title="Average Salary ($)",
-        yaxis_title="Department",
-        template="plotly_white",
-    )
-    fig.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+    elif analysis_type == "highest_salaries":
+        # Query for highest individual salaries
+        query = f"""
+            SELECT full_name, salary
+            FROM asu_employee_salary_data
+            WHERE calendar_year = {selected_year}
+            ORDER BY salary DESC
+            LIMIT {top_n};
+        """
+        data = pd.read_sql_query(query, conn)
+
+        # Rename columns for better display
+        data.rename(
+            columns={"full_name": "Employee", "salary": "Salary"},
+            inplace=True,
+        )
+
+        # Create bar chart
+        fig = px.bar(
+            data,
+            x="Salary",
+            y="Employee",
+            orientation="h",
+            title=f"Highest Individual Salaries for {selected_year} (Top {top_n})",
+            labels={"Salary": "Salary ($)", "Employee": "Employee"},
+            text="Salary",
+        )
+        fig.update_layout(
+            yaxis={"categoryorder": "total ascending"},
+            xaxis_title="Salary ($)",
+            yaxis_title="Employee",
+            template="plotly_white",
+        )
+        fig.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+
     return fig
 
 
