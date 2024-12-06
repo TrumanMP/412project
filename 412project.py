@@ -52,8 +52,9 @@ available_departments = departments_data["department_description"].tolist()
 # Initialize Dash app
 app = Dash(__name__)
 
+
 app.layout = html.Div(
-    [
+    children=[
         html.H1("Salary Analysis"),
         html.Label("Select Analysis Type:"),
         dcc.Dropdown(
@@ -67,9 +68,9 @@ app.layout = html.Div(
                 },
                 {"label": "Top N Salary Growth Over Years", "value": "salary_growth"},
                 {
-                    "label": "Individual Department Salary Growth",  # My text editor makes this formatting weird sometimes.
+                    "label": "Individual Department Salary Growth",
                     "value": "department_salary_growth",
-                },  # New option
+                },
                 {"label": "Highest Individual Salaries", "value": "highest_salaries"},
             ],
             value="avg_salary",  # Default option
@@ -101,9 +102,26 @@ app.layout = html.Div(
             id="data-table",
             columns=[],
             page_size=10,
-            style_table={"overflowX": "auto"},
+            style_table={
+                "overflowX": "auto",
+                "backgroundColor": "maroon",  # Set background to maroon
+                "color": "gold",
+            },
+            style_header={
+                "backgroundColor": "maroon",  # Set header background to maroon
+                "fontWeight": "bold",
+                "color": "gold",  # Set text color to gold
+                "fontSize": "14px",  # Optional: Set a specific font size
+            },
+            style_cell={
+                "backgroundColor": "maroon",  # Set cell background to maroon
+                "color": "gold",  # Set cell text color to gold
+                "fontSize": "12px",  # Optional: Set font size
+                "padding": "10px",  # Optional: Adjust padding
+                "textAlign": "left",  # Optional: Align text to the left
+            },
         ),
-    ]
+    ],
 )
 
 
@@ -172,14 +190,22 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
             title=f"Average Salary by Department for {selected_year} (Top {top_n} + Other)",
             labels={"Average Salary": "Average Salary ($)", "Department": "Department"},
             text="Average Salary",
+            color_discrete_sequence=["gold"],  # Set bars to gold
         )
         chart_figure.update_layout(
             yaxis={"categoryorder": "total ascending"},
             xaxis_title="Average Salary ($)",
             yaxis_title="Department",
             template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
         )
-        chart_figure.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+        chart_figure.update_traces(
+            texttemplate="$%{text:.2f}",
+            textposition="outside",
+            marker=dict(opacity=0.6),
+        )
         table_columns = [{"name": col, "id": col} for col in data.columns]
         table_data = data.to_dict("records")
 
@@ -229,14 +255,23 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
             title=f"Median Salary by Department for {selected_year} (Top {top_n} + Other)",
             labels={"Median Salary": "Median Salary ($)", "Department": "Department"},
             text="Median Salary",
+            color_discrete_sequence=["gold"],  # Set bars to gold
         )
         chart_figure.update_layout(
             yaxis={"categoryorder": "total ascending"},
             xaxis_title="Median Salary ($)",
             yaxis_title="Department",
             template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
         )
-        chart_figure.update_traces(texttemplate="$%{text:.2f}", textposition="outside")
+
+        chart_figure.update_traces(
+            texttemplate="$%{text:.2f}",
+            textposition="outside",
+            marker=dict(opacity=0.6),
+        )
         table_columns = [{"name": col, "id": col} for col in data.columns]
         table_data = data.to_dict("records")
 
@@ -274,6 +309,19 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
             xaxis_title="Department",
             yaxis_title="Salary ($)",
             template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
+        )
+
+        chart_figure.update_traces(
+            # boxmean="sd",  # Show the standard deviation as the mean
+            marker=dict(color="gold"),  # Set the box color to gold
+            line=dict(color="gold"),  # Set the line color to gold
+            # whiskerwidth=0.5,  # Width of the whiskers
+            # boxpoints="all",  # Show all points
+            # jitter=0.05,  # Add some jitter to the points
+            pointpos=0,  # Adjust point position
         )
 
         table_columns = [{"name": col, "id": col} for col in data.columns]
@@ -343,6 +391,16 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
             y="avg_salary",
             title=f"Salary Growth Over Years for {selected_department}",
         )
+
+        chart_figure.update_layout(
+            xaxis_title="Department",
+            yaxis_title="Salary ($)",
+            template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
+        )
+        chart_figure.update_traces(line=dict(color="gold"))
         table_columns = [{"name": col, "id": col} for col in data.columns]
         table_data = data.to_dict("records")
     elif analysis_type == "highest_salaries":
@@ -370,15 +428,22 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
             title=f"Highest Individual Salaries for {selected_year} (Top {top_n})",
             labels={"Salary": "Salary ($)", "Employee": "Employee"},
             text="Salary",
+            color_discrete_sequence=["gold"],  # Set bars to gold
         )
         chart_figure.update_layout(
             yaxis={"categoryorder": "total ascending"},
             xaxis_title="Salary ($)",
             yaxis_title="Employee",
             template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
         )
+
         chart_figure.update_traces(
-            text=data["Salary"].apply(lambda x: f"${x:,.2f}"), textposition="outside"
+            text=data["Salary"].apply(lambda x: f"${x:,.2f}"),
+            textposition="outside",
+            marker=dict(opacity=0.6),
         )
 
         table_columns = [{"name": col, "id": col} for col in data.columns]

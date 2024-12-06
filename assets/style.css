@@ -1,0 +1,92 @@
+
+/* ASU Maroon and Gold Color Theme */
+body {
+    background-color: maroon;
+    color: gold;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: gold;
+}
+
+label, p, input, select, textarea {
+    color: gold;
+}
+
+input, select, textarea {
+    background-color: #660000; /* Darker maroon */
+    border: 1px solid gold;
+    padding: 5px;
+    color: gold;
+}
+
+input[type="number"] {
+    width: 60px;
+}
+
+button {
+    background-color: gold;
+    color: maroon;
+    border: 2px solid gold;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background-color: #cc9900; /* Lighter gold */
+    color: maroon;
+}
+
+.data-table {
+    background-color: maroon;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.data-table th {
+    background-color: maroon;
+    color: gold;
+    font-weight: bold;
+    text-align: left;
+    padding: 10px;
+}
+
+.data-table td {
+    background-color: maroon;
+    color: gold;
+    text-align: left;
+    padding: 10px;
+}
+
+.data-table tr:nth-child(even) {
+    background-color: #660000; /* Slightly darker maroon */
+}
+
+.data-table tr:hover {
+    background-color: #cc9900; /* Highlight row */
+}
+
+.graph-container {
+    background-color: maroon;
+    color: gold;
+}
+
+
+/* dropdown menu hover effect */
+.VirtualizedSelectFocusedOption {
+    background-color: maroon;
+    opacity: .7;
+}
+/* dropdown menu options */
+.VirtualizedSelectOption {
+    background-color: maroon;
+    color: gold;
+ }
+.Select--single > .Select-control .Select-value, .Select-placeholder {
+    border: 1px solid grey;
+    border-radius: 4px;
+}
