@@ -6,35 +6,28 @@ import psycopg2
 from dash import Dash, Input, Output, dcc, html
 from dash.dash_table import DataTable
 
+# Get database credentials
 
-# Manual PostgreSQL connection handling
+
 def get_db_credentials():
-    manual_input = input(
-        "Do you have environment variables for db_host, db_port, db_name, db_user, and db_password (Y/N)? : "
-    )
-
-    if manual_input.lower() == "y":
-        db_host = os.getenv("DB_HOST")
-        db_port = os.getenv("DB_PORT")
-        db_name = os.getenv("DB_NAME")
-        db_user = os.getenv("DB_USER")
-        db_password = os.getenv("DB_PASSWORD")
-    else:
-        db_host = input("Enter the database host: ")
-        db_port = input("Enter the database port: ")
-        db_name = input("Enter the database name: ")
-        db_user = input("Enter the database username: ")
-        db_password = input("Enter the database password: ")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
+    db_name = os.getenv("DB_NAME")
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
 
     return db_host, db_port, db_name, db_user, db_password
 
 
-# Get database credentials
 db_host, db_port, db_name, db_user, db_password = get_db_credentials()
 
 try:
     conn = psycopg2.connect(
-        host=db_host, port=db_port, database=db_name, user=db_user, password=db_password
+        host=db_host,
+        port=db_port,
+        database=db_name,
+        user=db_user,
+        password=db_password,
     )
     print("Connection to PostgreSQL database successful!")
 except Exception as e:
@@ -48,7 +41,6 @@ years_data = pd.read_sql_query(years_query, conn)
 departments_data = pd.read_sql_query(departments_query, conn)
 available_years = years_data["calendar_year"].tolist()
 available_departments = departments_data["department_description"].tolist()
-
 # Initialize Dash app
 app = Dash(__name__)
 
@@ -66,12 +58,15 @@ app.layout = html.Div(
                     "label": "Salary Distribution by Department",
                     "value": "salary_distribution",
                 },
-                {"label": "Top N Salary Growth Over Years", "value": "salary_growth"},
                 {
                     "label": "Individual Department Salary Growth",
                     "value": "department_salary_growth",
                 },
                 {"label": "Highest Individual Salaries", "value": "highest_salaries"},
+                {
+                    "label": "Top N Department Salary Growth Over Time",
+                    "value": "top_departments_growth",
+                },
             ],
             value="avg_salary",  # Default option
         ),
@@ -327,55 +322,6 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
         table_columns = [{"name": col, "id": col} for col in data.columns]
         table_data = filtered_data.to_dict("records")
 
-        ''' #Work in progress. Currently makes no sense since top N metric is not well-defined.
-        elif analysis_type == "salary_growth":
-            query = f"""
-                SELECT calendar_year, department_description, AVG(salary) AS avg_salary
-                FROM asu_employee_salary_data
-                GROUP BY calendar_year, department_description
-                ORDER BY calendar_year, avg_salary DESC;
-            """
-            data = pd.read_sql_query(query, conn)
-
-            # Aggregate data to find the most relevant departments for filtering
-            avg_salary_data = (
-                data.groupby("department_description", as_index=False)["avg_salary"]
-                .mean()
-                .rename(columns={"avg_salary": "overall_avg_salary"})
-            )
-            avg_salary_data = avg_salary_data.sort_values(
-                by="overall_avg_salary", ascending=False
-            )
-
-            # Filter Top N based on average salary
-            top_departments = avg_salary_data.iloc[:top_n][
-                "department_description"
-            ].tolist()
-            filtered_data = data[data["department_description"].isin(top_departments)]
-
-            # Plot salary growth for the filtered departments
-            chart_figure = px.line(
-                filtered_data,
-                x="calendar_year",
-                y="avg_salary",
-                color="department_description",
-                title=f"Salary Growth Over Years for Top {top_n} Departments",
-                labels={
-                    "calendar_year": "Year",
-                    "avg_salary": "Average Salary ($)",
-                    "department_description": "Department",
-                },
-            )
-            chart_figure.update_layout(
-                xaxis_title="Year",
-                yaxis_title="Average Salary ($)",
-                template="plotly_white",
-            )
-
-            table_columns = [{"name": col, "id": col} for col in data.columns]
-            table_data = filtered_data.to_dict("records")
-            '''
-
     elif analysis_type == "department_salary_growth":
         query = f"""
                 SELECT calendar_year, AVG(salary) AS avg_salary
@@ -403,6 +349,61 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
         chart_figure.update_traces(line=dict(color="gold"))
         table_columns = [{"name": col, "id": col} for col in data.columns]
         table_data = data.to_dict("records")
+
+    # New case for Top N Department Salary Growth
+    elif analysis_type == "top_departments_growth":
+        query = """
+            SELECT department_description, calendar_year, AVG(salary) AS avg_salary
+            FROM asu_employee_salary_data
+            GROUP BY department_description, calendar_year
+            ORDER BY department_description, calendar_year;
+        """
+        data = pd.read_sql_query(query, conn)
+
+        # Calculate overall growth for each department
+        growth_data = (
+            data.pivot_table(
+                index="calendar_year",
+                columns="department_description",
+                values="avg_salary",
+            )
+            .fillna(0)
+            .pct_change()
+            .mean()
+            .sort_values(ascending=False)
+        )
+
+        # Get top N departments
+        top_departments = growth_data.head(top_n).index.tolist()
+
+        # Filter data for top departments
+        filtered_data = data[data["department_description"].isin(top_departments)]
+
+        # Plot salary growth for top departments
+        chart_figure = px.line(
+            filtered_data,
+            x="calendar_year",
+            y="avg_salary",
+            color="department_description",
+            title=f"Top {top_n} Departments Salary Growth Over Time",
+            labels={
+                "avg_salary": "Average Salary ($)",
+                "calendar_year": "Year",
+                "department_description": "Department",
+            },
+        )
+        chart_figure.update_layout(
+            template="plotly_white",
+            plot_bgcolor="maroon",
+            paper_bgcolor="maroon",
+            font=dict(color="gold"),
+        )
+        chart_figure.update_traces(line=dict(width=3), marker=dict(opacity=0.8))
+
+        # Prepare table
+        table_columns = [{"name": col, "id": col} for col in data.columns]
+        table_data = filtered_data.to_dict("records")
+
     elif analysis_type == "highest_salaries":
         # Query for highest individual salaries
         query = f"""
@@ -454,4 +455,6 @@ def update_chart_and_table(analysis_type, selected_year, top_n, selected_departm
 
 # Run the app
 if __name__ == "__main__":
+    # Manual PostgreSQL connection handling
+
     app.run_server(debug=True)
